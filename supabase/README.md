@@ -42,6 +42,41 @@ meetings, transcripts, minutes, tasks, personal meetings, notifications and
 audit trail. It is idempotent — existing accounts are reused and their passwords
 re-synced. `npm run db:reset` wipes the demo *content* first but keeps accounts.
 
+### No-demo-data option (recommended for production-like setup)
+
+If you only want real auth identities for the 4 roles and **no demo content
+rows**, run:
+
+```bash
+npm run db:push
+npm run db:seed-users-only
+```
+
+This creates/updates only:
+
+- `admin@zppsu.edu.ph` / `admin123`
+- `president@zppsu.edu.ph` / `head123`
+- `secretary@zppsu.edu.ph` / `sec123`
+- `faculty@zppsu.edu.ph` / `fac123`
+
+and upserts corresponding `profiles` entries plus `departments.head_id` for
+`CICS` and `ICT`.
+
+It does **not** insert rows in `meetings`, `meeting_participants`,
+`audio_recordings`, `transcripts`, `minutes`, `tasks`, `personal_meetings`,
+`notifications`, `audit_log`, or `app_settings`.
+
+You can verify quickly in SQL editor:
+
+```sql
+select count(*) from meetings;
+select count(*) from tasks;
+select count(*) from transcripts;
+select count(*) from minutes;
+```
+
+All should be `0` in a users-only seed setup.
+
 ## Migration order
 
 | File | Contents |
@@ -82,3 +117,15 @@ await c.auth.signInWithPassword({ email: 'faculty@zppsu.edu.ph', password: 'fac1
 const { data } = await c.from('meetings').select('title, department_id');
 // expect: only CICS meetings, or meetings this account attends
 ```
+
+## Bilingual / multilingual transcript rules (EN/TL mixed)
+
+No schema change is needed for English + Tagalog mixed transcripts:
+
+- Set `meetings.language` as the meeting language mode (`en-US`, `tl-PH`,
+  `tl-PH-mixed`, `mixed`).
+- Store utterances in `transcripts.segments` (`jsonb`) and allow mixed language
+  text inside each segment.
+- Keep `transcripts.language` as the source language of that transcript row.
+- Set `transcripts.translated_to` when writing a translated pass (for example,
+  source `tl-PH`, translated `en-US`).
