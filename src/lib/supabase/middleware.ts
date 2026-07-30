@@ -70,8 +70,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Signed in: keep users out of the auth pages.
-  if (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password') {
+  // Signed in users may still open /login to switch accounts.
+  if (pathname === '/register' || pathname === '/forgot-password') {
     const role = (claims.user_metadata as { role?: string } | undefined)?.role;
     const url = request.nextUrl.clone();
     url.pathname = (role && ROLE_DASHBOARDS[role]) || '/';
