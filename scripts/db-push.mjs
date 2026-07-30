@@ -25,14 +25,57 @@ const args = process.argv.slice(2);
 const forceIdx = args.indexOf('--force');
 const forced = forceIdx >= 0 ? args.slice(forceIdx + 1) : [];
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
+const rawUrl = process.env.DATABASE_URL;
+if (!rawUrl) {
   console.error(
     'DATABASE_URL is not set.\n' +
       'Add it to .env.local — Supabase dashboard -> Connect -> Direct connection.\n' +
       'Example: postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres',
   );
   process.exit(1);
+}
+
+/**
+ * Percent-encodes the password so a literal special character cannot break URL
+ * parsing.
+ *
+ * Supabase-generated passwords routinely contain `?`, `,`, `#`, `@` and `/`, all
+ * of which are structural in a URL — a raw `?` starts the query component, so
+ * the whole string fails to parse with a bare "Invalid URL". Expecting whoever
+ * pastes the password to hand-encode it is a reliable way to lose an afternoon,
+ * so handle it here.
+ *
+ * The credential delimiter is the LAST `@`, since the password may contain one.
+ */
+function normalizeConnectionString(url) {
+  const schemeEnd = url.indexOf('://');
+  if (schemeEnd < 0) return url;
+
+  const scheme = url.slice(0, schemeEnd + 3);
+  const rest = url.slice(schemeEnd + 3);
+
+  const at = rest.lastIndexOf('@');
+  if (at < 0) return url; // no credentials to encode
+
+  const credentials = rest.slice(0, at);
+  const hostAndPath = rest.slice(at + 1);
+
+  const colon = credentials.indexOf(':');
+  if (colon < 0) return url; // user only, no password
+
+  const user = credentials.slice(0, colon);
+  const password = credentials.slice(colon + 1);
+
+  // Already encoded? Leave it be rather than turning %XX into %25XX.
+  const alreadyEncoded = /%[0-9A-Fa-f]{2}/.test(password);
+  const safePassword = alreadyEncoded ? password : encodeURIComponent(password);
+
+  return `${scheme}${encodeURIComponent(user)}:${safePassword}@${hostAndPath}`;
+}
+
+const connectionString = normalizeConnectionString(rawUrl);
+if (connectionString !== rawUrl) {
+  console.log('note: percent-encoded special characters in the database password');
 }
 
 const client = new pg.Client({
