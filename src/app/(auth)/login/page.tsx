@@ -1,0 +1,154 @@
+'use client';
+
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { FormEvent, useMemo, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+
+type DemoAccount = {
+  label: string;
+  email: string;
+  password: string;
+};
+
+const DEMO_ACCOUNTS: DemoAccount[] = [
+  { label: 'Administrator', email: 'admin@zppsu.edu.ph', password: 'admin123' },
+  { label: 'Head / Dean', email: 'president@zppsu.edu.ph', password: 'head123' },
+  { label: 'Secretary', email: 'secretary@zppsu.edu.ph', password: 'sec123' },
+  { label: 'Faculty', email: 'faculty@zppsu.edu.ph', password: 'fac123' },
+];
+
+export default function LoginPage() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const supabase = useMemo(() => createClient(), []);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+
+      const userId = data.user?.id;
+      if (userId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('active')
+          .eq('id', userId)
+          .maybeSingle();
+        if (profile?.active === false) {
+          await supabase.auth.signOut();
+          setError('Account deactivated. Contact your administrator.');
+          return;
+        }
+      }
+
+      const next = params.get('next');
+      router.push(next && next.startsWith('/') ? next : '/');
+      router.refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-background p-gutter flex items-center justify-center">
+      <div className="w-full max-w-[480px] bg-surface-container-lowest rounded-xl border border-outline-variant shadow-primary-lg p-xl">
+        <div className="text-center mb-lg">
+          <h1 className="font-h2 text-h2 text-primary">ZPPSU SmartMin Login</h1>
+          <p className="font-body-md text-on-surface-variant">
+            Institutional Governance and AI Assistant
+          </p>
+        </div>
+
+        <form className="space-y-md" onSubmit={onSubmit}>
+          <div>
+            <label className="block font-label-caps text-on-surface mb-xs" htmlFor="email">
+              Institutional Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              required
+              className="w-full px-md py-md bg-surface-container-low border-2 border-transparent focus:border-primary focus:ring-0 rounded-lg"
+              placeholder="user@zppsu.edu.ph"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block font-label-caps text-on-surface mb-xs" htmlFor="password">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              className="w-full px-md py-md bg-surface-container-low border-2 border-transparent focus:border-primary focus:ring-0 rounded-lg"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          {error ? (
+            <div className="text-error font-body-sm bg-error-container p-sm rounded-lg">{error}</div>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-primary text-on-primary font-body-md font-semibold py-md rounded-lg shadow-primary-md hover:opacity-90 transition disabled:opacity-60"
+          >
+            {loading ? 'Signing in...' : 'Login'}
+          </button>
+
+          <p className="text-center font-body-sm text-on-surface-variant">
+            Don&apos;t have an account?{' '}
+            <Link href="/register" className="text-primary font-semibold hover:underline">
+              Register
+            </Link>
+          </p>
+          <p className="text-center font-body-sm text-on-surface-variant">
+            <Link href="/forgot-password" className="text-primary hover:underline">
+              Forgot Password?
+            </Link>
+          </p>
+        </form>
+
+        <div className="mt-lg p-md bg-surface-container rounded-lg border border-outline-variant">
+          <h2 className="font-label-caps text-on-surface mb-sm">Defense Demo Accounts</h2>
+          <div className="grid grid-cols-2 gap-xs">
+            {DEMO_ACCOUNTS.map((a) => (
+              <button
+                key={a.email}
+                type="button"
+                onClick={() => {
+                  setEmail(a.email);
+                  setPassword(a.password);
+                }}
+                className="text-left p-sm rounded-lg bg-surface-container-lowest border border-outline-variant hover:border-primary transition-colors"
+              >
+                <div className="font-body-sm font-semibold text-primary">{a.label}</div>
+                <div className="font-caption text-on-surface-variant truncate">{a.email}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}

@@ -4,12 +4,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 /** Routes reachable without a session. */
 const PUBLIC_PATHS = ['/', '/login', '/register', '/forgot-password', '/auth'];
 
-/** Landing route for each role, mirroring ROLE_DASHBOARDS in the legacy shared.js. */
+/**
+ * Temporary landing route for signed-in users.
+ *
+ * The legacy app routed by role to HTML dashboards. In the Next.js migration,
+ * those role dashboards are not all implemented yet, so redirecting to them
+ * causes immediate 404s after login. Keep users on "/" until those routes land.
+ */
 export const ROLE_DASHBOARDS: Record<string, string> = {
-  admin: '/admin/dashboard',
-  head: '/head/dashboard',
-  secretary: '/secretary/dashboard',
-  faculty: '/faculty/dashboard',
+  admin: '/',
+  head: '/',
+  secretary: '/',
+  faculty: '/',
 };
 
 function isPublic(pathname: string) {
