@@ -13,13 +13,14 @@
  * "Direct connection" (or the session pooler on port 5432). The password is the
  * database password, not the service-role key.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(HERE, '..', 'supabase', 'migrations');
+const ENV_FILE = join(HERE, '..', '.env.local');
 
 const args = process.argv.slice(2);
 const forceIdx = args.indexOf('--force');
@@ -34,6 +35,44 @@ if (!rawUrl) {
   );
   process.exit(1);
 }
+
+/**
+ * Diffs the raw .env.local line against what --env-file actually loaded.
+ *
+ * Node's env-file parser treats an UNQUOTED `#` as a comment delimiter -- the
+ * same as dotenv and most shells. `DATABASE_URL=postgresql://postgres:pa#ss@host`
+ * silently truncates at `#`, and the truncated value still parses as a
+ * syntactically valid URL, so nothing downstream can tell the difference: pg
+ * connects, sends the wrong password, and the only symptom is
+ * "password authentication failed" -- which reads exactly like a wrong
+ * password, not a mangled one. This caught that class of bug once already;
+ * check for it up front instead of debugging it again next time.
+ */
+function checkForEnvFileTruncation() {
+  if (!existsSync(ENV_FILE)) return;
+  const line = readFileSync(ENV_FILE, 'utf8')
+    .split(/\r?\n/)
+    .find((l) => l.startsWith('DATABASE_URL='));
+  if (!line) return;
+
+  let raw = line.slice('DATABASE_URL='.length);
+  if (/^".*"$/.test(raw) || /^'.*'$/.test(raw)) raw = raw.slice(1, -1);
+
+  if (raw !== rawUrl) {
+    console.error(`
+DATABASE_URL in .env.local is ${raw.length} characters, but Node only loaded ${rawUrl.length}.
+
+This almost always means an unquoted special character truncated the value --
+most commonly the # character, which --env-file treats as a comment start, or ?,
+which a URL parser reads as the start of the query string.
+
+Fix: wrap the value in double quotes in .env.local:
+  DATABASE_URL="postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres"`);
+    process.exit(1);
+  }
+}
+
+checkForEnvFileTruncation();
 
 /**
  * Percent-encodes the password so a literal special character cannot break URL
@@ -74,31 +113,35 @@ function normalizeConnectionString(url) {
 }
 
 /**
- * Fills in a missing host from the Supabase project ref.
+ * Refuses to guess a missing host rather than fabricating one.
  *
- * The connection string is one long line with a password in the middle, and it
- * gets pasted by hand — a truncated copy that stops after the password
- * ("postgresql://postgres:secret" with no @host) is a common outcome, and pg
- * reports it only as a bare "Invalid URL" from deep inside its constructor.
- * The host is fully derivable from NEXT_PUBLIC_SUPABASE_URL, so derive it.
+ * An earlier version of this reconstructed a plausible-looking connection
+ * string from NEXT_PUBLIC_SUPABASE_URL whenever `@host` was missing. That is
+ * exactly how the env-file truncation bug above went undetected for two full
+ * debugging rounds: the fabricated string parsed as a perfectly valid URL and
+ * connected, so the only symptom was "password authentication failed" --
+ * which reads like a wrong password, not a silently mangled one. A missing
+ * credential should stop the script, not be guessed at.
  */
-function completeHost(url) {
-  if (url.includes('@')) return url;
+function checkHasHost(url) {
+  if (url.includes('@')) return;
+  console.error(`
+DATABASE_URL has no @host segment.
 
-  const ref = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').match(
-    /https?:\/\/([a-z0-9]+)\.supabase\.co/i,
-  )?.[1];
-  if (!ref) return url;
+Expected shape:
+  postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres
 
-  const trimmed = url.replace(/\/+$/, '');
-  return `${trimmed}@db.${ref}.supabase.co:5432/postgres`;
+Copy the whole line from the Supabase dashboard -> Connect -> Direct connection,
+and wrap it in double quotes in .env.local -- an unquoted # or ? in the password
+gets treated as a comment or query delimiter and truncates the value before it
+reaches this script.`,
+  );
+  process.exit(1);
 }
 
-let connectionString = normalizeConnectionString(completeHost(rawUrl));
-if (!rawUrl.includes('@') && connectionString.includes('@')) {
-  console.log('note: DATABASE_URL had no host; completed it from the project ref');
-}
-if (connectionString !== completeHost(rawUrl)) {
+checkHasHost(rawUrl);
+const connectionString = normalizeConnectionString(rawUrl);
+if (connectionString !== rawUrl) {
   console.log('note: percent-encoded special characters in the database password');
 }
 
