@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"SessionStart\\\",\\\"additionalContext\\\":\\\"Graphify is installed and active for this project (skill at ~/.claude/skills/graphify/SKILL.md). Treat it as the default tool for questions about this codebase - architecture, file relationships, dependencies, or project content. Build or refresh the graph with: graphify . (add --update to merge only changed files). Query it with: graphify query <text>. Trace links with: graphify path <A> <B>. When graphify-out/ exists, answer codebase questions from the graph first before reading files ad hoc.\\\"}}\"",
+            "statusMessage": "Loading graphify context",
+            "suppressOutput": true
+          }
+        ]
+      }
+    ]
+  }
+}
