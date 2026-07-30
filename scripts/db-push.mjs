@@ -73,9 +73,57 @@ function normalizeConnectionString(url) {
   return `${scheme}${encodeURIComponent(user)}:${safePassword}@${hostAndPath}`;
 }
 
-const connectionString = normalizeConnectionString(rawUrl);
-if (connectionString !== rawUrl) {
+/**
+ * Fills in a missing host from the Supabase project ref.
+ *
+ * The connection string is one long line with a password in the middle, and it
+ * gets pasted by hand — a truncated copy that stops after the password
+ * ("postgresql://postgres:secret" with no @host) is a common outcome, and pg
+ * reports it only as a bare "Invalid URL" from deep inside its constructor.
+ * The host is fully derivable from NEXT_PUBLIC_SUPABASE_URL, so derive it.
+ */
+function completeHost(url) {
+  if (url.includes('@')) return url;
+
+  const ref = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').match(
+    /https?:\/\/([a-z0-9]+)\.supabase\.co/i,
+  )?.[1];
+  if (!ref) return url;
+
+  const trimmed = url.replace(/\/+$/, '');
+  return `${trimmed}@db.${ref}.supabase.co:5432/postgres`;
+}
+
+let connectionString = normalizeConnectionString(completeHost(rawUrl));
+if (!rawUrl.includes('@') && connectionString.includes('@')) {
+  console.log('note: DATABASE_URL had no host; completed it from the project ref');
+}
+if (connectionString !== completeHost(rawUrl)) {
   console.log('note: percent-encoded special characters in the database password');
+}
+
+// Fail with something actionable rather than pg's bare "Invalid URL".
+try {
+  const probe = new URL(connectionString);
+  if (!probe.hostname) throw new Error('no host');
+  if (!probe.password) {
+    console.error(
+      'DATABASE_URL has no password.\n' +
+        'Expected: postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres',
+    );
+    process.exit(1);
+  }
+} catch {
+  console.error(
+    'DATABASE_URL could not be parsed as a connection string.\n\n' +
+      'Expected shape:\n' +
+      '  postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres\n\n' +
+      'Copy it from the Supabase dashboard -> Connect -> Direct connection, and\n' +
+      'make sure the whole line is present — a copy that stops after the password\n' +
+      'is the usual cause. Special characters in the password are handled here, so\n' +
+      'paste it exactly as shown.',
+  );
+  process.exit(1);
 }
 
 const client = new pg.Client({
