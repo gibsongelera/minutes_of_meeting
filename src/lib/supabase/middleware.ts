@@ -51,6 +51,12 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!claims) {
+    /*
+     * Route handlers answer for themselves. Redirecting an API call to the login
+     * page hands a fetch() caller a 307 and an HTML body where it expected JSON;
+     * each handler checks the session and returns a real 401 instead.
+     */
+    if (pathname.startsWith('/api/')) return supabaseResponse;
     if (isPublic(pathname)) return supabaseResponse;
     const url = request.nextUrl.clone();
     url.pathname = '/login';
