@@ -9,6 +9,9 @@ out/
 build/
 next-env.d.ts
 
+# testing
+coverage/
+
 # env — never commit keys
 .env
 .env*.local
