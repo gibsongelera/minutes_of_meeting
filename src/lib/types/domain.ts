@@ -27,6 +27,18 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   faculty: 'Faculty Member',
 };
 
+/** Where each role lands after login. Single source of truth for both the
+ * post-login redirect (login/page.tsx) and the signed-in-user-hits-/register
+ * redirect (lib/supabase/middleware.ts) - keeping one file importable from
+ * both a client component and edge middleware without pulling in
+ * @supabase/ssr on the client bundle. */
+export const ROLE_DASHBOARDS: Record<UserRole, string> = {
+  admin: '/admin',
+  head: '/head',
+  secretary: '/secretary',
+  faculty: '/faculty',
+};
+
 export interface Department {
   id: string;
   name: string;

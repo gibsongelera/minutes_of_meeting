@@ -1,22 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { ROLE_DASHBOARDS, type UserRole } from '@/lib/types/domain';
 
 /** Routes reachable without a session. */
 const PUBLIC_PATHS = ['/', '/login', '/register', '/forgot-password', '/auth'];
-
-/**
- * Temporary landing route for signed-in users.
- *
- * The legacy app routed by role to HTML dashboards. In the Next.js migration,
- * those role dashboards are not all implemented yet, so redirecting to them
- * causes immediate 404s after login. Keep users on "/" until those routes land.
- */
-export const ROLE_DASHBOARDS: Record<string, string> = {
-  admin: '/',
-  head: '/',
-  secretary: '/',
-  faculty: '/',
-};
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => (p === '/' ? pathname === '/' : pathname.startsWith(p)));
@@ -74,7 +61,7 @@ export async function updateSession(request: NextRequest) {
   if (pathname === '/register' || pathname === '/forgot-password') {
     const role = (claims.user_metadata as { role?: string } | undefined)?.role;
     const url = request.nextUrl.clone();
-    url.pathname = (role && ROLE_DASHBOARDS[role]) || '/';
+    url.pathname = (role && ROLE_DASHBOARDS[role as UserRole]) || '/';
     url.search = '';
     return NextResponse.redirect(url);
   }

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { ROLE_DASHBOARDS, type UserRole } from '@/lib/types/domain';
 
 type DemoAccount = {
   label: string;
@@ -43,10 +44,11 @@ function LoginForm() {
       }
 
       const userId = data.user?.id;
+      let role: UserRole | null = null;
       if (userId) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('active')
+          .select('active, role')
           .eq('id', userId)
           .maybeSingle();
         if (profile?.active === false) {
@@ -54,10 +56,15 @@ function LoginForm() {
           setError('Account deactivated. Contact your administrator.');
           return;
         }
+        role = profile?.role ?? null;
       }
 
+      // Honor an explicit redirect target (set when the proxy bounced an
+      // unauthenticated visit to a protected page); otherwise go straight to
+      // this user's own dashboard rather than the public landing page.
       const next = params.get('next');
-      router.push(next && next.startsWith('/') ? next : '/');
+      const destination = next && next.startsWith('/') ? next : (role && ROLE_DASHBOARDS[role]) || '/';
+      router.push(destination);
       router.refresh();
     } finally {
       setLoading(false);
