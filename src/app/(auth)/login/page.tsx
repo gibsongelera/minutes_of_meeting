@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 type DemoAccount = {
@@ -18,7 +18,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   { label: 'Faculty', email: 'faculty@zppsu.edu.ph', password: 'fac123' },
 ];
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
@@ -150,5 +150,27 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+/**
+ * useSearchParams() (read inside LoginForm, for the post-login `?next=`
+ * redirect) requires a Suspense boundary for Next.js to statically prerender
+ * this route — otherwise `next build` fails outright. The fallback is
+ * transient (hydration only) and intentionally minimal.
+ */
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-background p-gutter flex items-center justify-center">
+          <div className="w-full max-w-[480px] bg-surface-container-lowest rounded-xl border border-outline-variant shadow-primary-lg p-xl text-center font-body-md text-on-surface-variant">
+            Loading...
+          </div>
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

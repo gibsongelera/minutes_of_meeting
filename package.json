@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "types": "tsc --noEmit",
+    "test": "vitest run",
     "db:push": "node --env-file=.env.local scripts/db-push.mjs",
     "db:seed": "node --env-file=.env.local scripts/seed-demo.mjs",
     "db:seed-users-only": "node --env-file=.env.local scripts/seed-users-only.mjs",
@@ -35,7 +36,8 @@
     "eslint-config-next": "16.2.12",
     "pg": "^8.22.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   },
   "description": "ZPPSU SmartMin - AI-assisted institutional governance platform",
   "browserslist": [

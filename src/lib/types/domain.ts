@@ -98,8 +98,52 @@ export interface Transcript {
   comments: ThreadComment[];
   source_audio_id: string | null;
   ai_model: string | null;
+  provider: string | null;
+  detected_language: string | null;
+  diarized: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type TranscriptionStatus =
+  | 'queued'
+  | 'uploading'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface TranscriptionJob {
+  id: string;
+  meeting_id: string;
+  audio_id: string;
+  provider: string;
+  provider_job_id: string | null;
+  model: string | null;
+  requested_language: string | null;
+  detected_language: string | null;
+  language_probability: number | null;
+  diarize: boolean;
+  keyterms: string[];
+  status: TranscriptionStatus;
+  error_code: string | null;
+  error_detail: string | null;
+  attempts: number;
+  raw_response: unknown;
+  transcript_id: string | null;
+  audio_duration_sec: number | null;
+  cost_usd: number | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface TranscriptSpeaker {
+  transcript_id: string;
+  speaker_label: string;
+  profile_id: string | null;
+  display_name: string;
 }
 
 export interface AgendaItem {
@@ -134,6 +178,7 @@ export interface Minutes {
   signatures: Signature[];
   comments: ThreadComment[];
   amendments: Amendment[];
+  ai_action_items: ExtractedActionItem[];
   status: MinutesStatus;
   locked_at: string | null;
   locked_by: string | null;
@@ -200,6 +245,7 @@ export interface AppSettings {
   default_language: string;
   institution_name: string;
   institution_short: string;
+  data_processing_notice: string;
 }
 
 export interface AudioRecording {

@@ -115,7 +115,17 @@ Or open DevTools and run `localStorage.clear()` + refresh.
 
 ## Privacy &amp; compliance
 
-- **Local Processing Only** badge across the UI signals that no audio leaves the device.
+- The former **Local Processing Only** badge has been corrected. Even in this HTML-only demo, the in-browser transcriber uses `window.SpeechRecognition`, which in Chrome streams audio to Google's servers — recording was never fully on-device, so the badge now reads "Encrypted Processing" / "Encrypted &amp; Audited" instead.
 - Every mutation (login, recording saved, MoM signed, task created/edited/deleted, settings changed, user CRUD, etc.) writes an entry to `localStorage.sm_audit`.
 - The Audit page exports CSV and JSON backups; a retention slider sets the auto-delete window.
 - Aligned with ZPPSU's Data Privacy Manual and the Data Privacy Act of 2012 (RA 10173).
+
+### The `feat/nextjs-supabase` branch (in progress)
+
+A parallel Next.js + Supabase rewrite lives on this branch, with a genuinely different data flow that must be disclosed accurately rather than inheriting the "local only" framing above:
+
+- Audio recordings upload to **Supabase Storage** (a private bucket, access-scoped to the meeting via row-level security).
+- Recordings are sent to **ElevenLabs** for transcription (speech-to-text and speaker diarization).
+- Transcripts are sent to **Anthropic** (Claude) to draft summaries, action items, and Minutes of the Meeting.
+- `app_settings.data_processing_notice` holds the user-facing text describing this pipeline; it explicitly states processing is not on-device only.
+- **Consult ZPPSU's Data Protection Officer before recording any real meeting** on this branch — this is an RA 10173 requirement, not a nicety. A pre-recording consent gate (participants informed the session is recorded and machine-transcribed, logged to `audit_log`) is required before real use and is tracked as follow-up UI work.
